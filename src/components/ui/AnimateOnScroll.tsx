@@ -17,8 +17,18 @@ export default function AnimateOnScroll({
 }: AnimateOnScrollProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Wait until mounted to avoid SSR mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
+    if (!mounted) return;
+    const el = ref.current;
+    if (!el) return;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -26,17 +36,20 @@ export default function AnimateOnScroll({
           observer.disconnect();
         }
       },
-      { threshold: 0.1, rootMargin: "0px 0px -48px 0px" }
+      { threshold: 0.08, rootMargin: "0px 0px -32px 0px" }
     );
-    if (ref.current) observer.observe(ref.current);
+    observer.observe(el);
     return () => observer.disconnect();
-  }, [delay]);
+  }, [delay, mounted]);
 
-  const transforms = {
-    up: "translateY(32px)",
-    left: "translateX(-32px)",
-    right: "translateX(32px)",
-    none: "none",
+  const getTransform = () => {
+    if (!mounted || visible) return "none";
+    switch (direction) {
+      case "left": return "translateX(-28px)";
+      case "right": return "translateX(28px)";
+      case "none": return "none";
+      default: return "translateY(28px)";
+    }
   };
 
   return (
@@ -44,9 +57,11 @@ export default function AnimateOnScroll({
       ref={ref}
       className={className}
       style={{
-        opacity: visible ? 1 : 0,
-        transform: visible ? "none" : transforms[direction],
-        transition: `opacity 0.8s cubic-bezier(0.25,0.46,0.45,0.94), transform 0.8s cubic-bezier(0.25,0.46,0.45,0.94)`,
+        opacity: !mounted || visible ? 1 : 0,
+        transform: getTransform(),
+        transition: mounted
+          ? `opacity 0.75s cubic-bezier(0.25,0.46,0.45,0.94), transform 0.75s cubic-bezier(0.25,0.46,0.45,0.94)`
+          : "none",
       }}
     >
       {children}
